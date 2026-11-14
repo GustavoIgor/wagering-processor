@@ -1,0 +1,19 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+
+*.log
+.DS_Store
+Thumbs.db
+
+# Generated TypeScript files
+*.tsbuildinfo
+/mikro-orm.config.js
+/mikro-orm.config.js.map
+/mikro-orm.config.d.ts
+
+# Temporary files
+/temp/
