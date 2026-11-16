@@ -43,4 +43,13 @@ export class Wallet {
       throw new Error('Amount must be positive');
     }
   }
+
+  static restore(
+    id: string,
+    playerId: string,
+    currency: string,
+    balance: string,
+  ): Wallet {
+    return new Wallet(id, playerId, currency, Money.from(balance, currency));
+  }
 }

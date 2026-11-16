@@ -314,14 +314,19 @@
           "primary": false,
           "nullable": false,
           "unique": false,
-          "length": 20,
+          "length": null,
           "precision": null,
           "scale": null,
           "default": "'PENDING'",
           "comment": null,
           "collation": null,
-          "enumItems": [],
-          "mappedType": "string"
+          "enumItems": [
+            "PENDING",
+            "PROCESSING",
+            "PUBLISHED",
+            "FAILED"
+          ],
+          "mappedType": "enum"
         },
         "updated_at": {
           "name": "updated_at",
@@ -364,7 +369,20 @@
           "unique": false
         }
       ],
-      "checks": [],
+      "checks": [
+        {
+          "name": "outbox_attempts_non_negative",
+          "expression": "attempts >= 0",
+          "definition": "CHECK ((attempts >= 0))",
+          "columnName": "attempts"
+        },
+        {
+          "name": "outbox_status_valid",
+          "expression": "\"status\" in ('PENDING', 'PROCESSING', 'PUBLISHED', 'FAILED')",
+          "definition": "check (\"status\" in ('PENDING', 'PROCESSING', 'PUBLISHED', 'FAILED'))",
+          "columnName": "status"
+        }
+      ],
       "triggers": [],
       "foreignKeys": {},
       "comment": null
@@ -448,7 +466,7 @@
           "autoincrement": false,
           "primary": true,
           "nullable": false,
-          "unique": false,
+          "unique": true,
           "length": null,
           "precision": null,
           "scale": null,
@@ -475,6 +493,23 @@
           "enumItems": [],
           "mappedType": "string"
         },
+        "next_reference_check_at": {
+          "name": "next_reference_check_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "collation": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
         "operation": {
           "name": "operation",
           "type": "varchar(20)",
@@ -483,14 +518,20 @@
           "primary": false,
           "nullable": false,
           "unique": false,
-          "length": 20,
+          "length": null,
           "precision": null,
           "scale": null,
           "default": null,
           "comment": null,
           "collation": null,
-          "enumItems": [],
-          "mappedType": "string"
+          "enumItems": [
+            "BET",
+            "WIN",
+            "LOSS",
+            "REFUND",
+            "ROLLBACK"
+          ],
+          "mappedType": "enum"
         },
         "payload_hash": {
           "name": "payload_hash",
@@ -543,6 +584,40 @@
           "enumItems": [],
           "mappedType": "string"
         },
+        "reference_attempts": {
+          "name": "reference_attempts",
+          "type": "int",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "0",
+          "comment": null,
+          "collation": null,
+          "enumItems": [],
+          "mappedType": "integer"
+        },
+        "reference_expires_at": {
+          "name": "reference_expires_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "collation": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
         "reference_transaction_id": {
           "name": "reference_transaction_id",
           "type": "varchar(128)",
@@ -585,14 +660,20 @@
           "primary": false,
           "nullable": false,
           "unique": false,
-          "length": 30,
+          "length": null,
           "precision": null,
           "scale": null,
           "default": "'PENDING'",
           "comment": null,
           "collation": null,
-          "enumItems": [],
-          "mappedType": "string"
+          "enumItems": [
+            "PENDING",
+            "PENDING_REFERENCE",
+            "PROCESSED",
+            "REJECTED",
+            "FAILED"
+          ],
+          "mappedType": "enum"
         },
         "updated_at": {
           "name": "updated_at",
@@ -630,6 +711,18 @@
         }
       },
       "indexes": [
+        {
+          "columnNames": [
+            "id",
+            "wallet_id",
+            "currency"
+          ],
+          "composite": true,
+          "constraint": true,
+          "keyName": "wager_transactions_id_wallet_currency_unique",
+          "primary": false,
+          "unique": true
+        },
         {
           "columnNames": [
             "id"
@@ -673,11 +766,61 @@
           "keyName": "wager_transactions_status_created_at_index",
           "primary": false,
           "unique": false
+        },
+        {
+          "columnNames": [
+            "status",
+            "next_reference_check_at"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "wager_transactions_status_next_reference_check_at_index",
+          "primary": false,
+          "unique": false
         }
       ],
-      "checks": [],
+      "checks": [
+        {
+          "name": "wager_transactions_amount_positive",
+          "expression": "amount > 0",
+          "definition": "CHECK ((amount > (0)::numeric))",
+          "columnName": "amount"
+        },
+        {
+          "name": "wager_transactions_currency_valid",
+          "expression": "currency ~ '^[A-Z]{3}$'::text",
+          "definition": "CHECK (((currency)::text ~ '^[A-Z]{3}$'::text))",
+          "columnName": "currency"
+        },
+        {
+          "name": "wager_transactions_operation_valid",
+          "expression": "\"operation\" in ('BET', 'WIN', 'LOSS', 'REFUND', 'ROLLBACK')",
+          "definition": "check (\"operation\" in ('BET', 'WIN', 'LOSS', 'REFUND', 'ROLLBACK'))",
+          "columnName": "operation"
+        },
+        {
+          "name": "wager_transactions_status_valid",
+          "expression": "\"status\" in ('PENDING', 'PENDING_REFERENCE', 'PROCESSED', 'REJECTED', 'FAILED')",
+          "definition": "check (\"status\" in ('PENDING', 'PENDING_REFERENCE', 'PROCESSED', 'REJECTED', 'FAILED'))",
+          "columnName": "status"
+        }
+      ],
       "triggers": [],
-      "foreignKeys": {},
+      "foreignKeys": {
+        "wager_transactions_wallet_currency_fk": {
+          "columnNames": [
+            "wallet_id",
+            "currency"
+          ],
+          "constraintName": "wager_transactions_wallet_currency_fk",
+          "localTableName": "public.wager_transactions",
+          "referencedColumnNames": [
+            "id",
+            "currency"
+          ],
+          "referencedTableName": "public.wallets"
+        }
+      },
       "comment": null
     },
     {
@@ -743,14 +886,17 @@
           "primary": false,
           "nullable": false,
           "unique": false,
-          "length": 10,
+          "length": null,
           "precision": null,
           "scale": null,
           "default": null,
           "comment": null,
           "collation": null,
-          "enumItems": [],
-          "mappedType": "string"
+          "enumItems": [
+            "DEBIT",
+            "CREDIT"
+          ],
+          "mappedType": "enum"
         },
         "id": {
           "name": "id",
@@ -759,7 +905,7 @@
           "autoincrement": false,
           "primary": true,
           "nullable": false,
-          "unique": false,
+          "unique": true,
           "length": null,
           "precision": null,
           "scale": null,
@@ -777,14 +923,19 @@
           "primary": false,
           "nullable": false,
           "unique": false,
-          "length": 20,
+          "length": null,
           "precision": null,
           "scale": null,
           "default": null,
           "comment": null,
           "collation": null,
-          "enumItems": [],
-          "mappedType": "string"
+          "enumItems": [
+            "BET",
+            "WIN",
+            "REFUND",
+            "ROLLBACK"
+          ],
+          "mappedType": "enum"
         },
         "reversal_of_entry_id": {
           "name": "reversal_of_entry_id",
@@ -841,6 +992,18 @@
       "indexes": [
         {
           "columnNames": [
+            "id",
+            "wallet_id",
+            "currency"
+          ],
+          "composite": true,
+          "constraint": true,
+          "keyName": "ledger_id_wallet_currency_unique",
+          "primary": false,
+          "unique": true
+        },
+        {
+          "columnNames": [
             "id"
           ],
           "composite": false,
@@ -870,9 +1033,101 @@
           "unique": true
         }
       ],
-      "checks": [],
-      "triggers": [],
-      "foreignKeys": {},
+      "checks": [
+        {
+          "name": "ledger_amount_positive",
+          "expression": "amount > 0",
+          "definition": "CHECK ((amount > (0)::numeric))",
+          "columnName": "amount"
+        },
+        {
+          "name": "ledger_currency_valid",
+          "expression": "currency ~ '^[A-Z]{3}$'::text",
+          "definition": "CHECK (((currency)::text ~ '^[A-Z]{3}$'::text))",
+          "columnName": "currency"
+        },
+        {
+          "name": "ledger_direction_reason_valid",
+          "expression": "((reason = 'BET'::text) AND (direction = 'DEBIT'::text)) OR ((reason = ANY (ARRAY['WIN'::character varying, 'REFUND'::character varying])) AND (direction = 'CREDIT'::text)) OR (reason = 'ROLLBACK'::text)",
+          "definition": "CHECK (((((reason)::text = 'BET'::text) AND ((direction)::text = 'DEBIT'::text)) OR (((reason)::text = ANY ((ARRAY['WIN'::character varying, 'REFUND'::character varying])::text[])) AND ((direction)::text = 'CREDIT'::text)) OR ((reason)::text = 'ROLLBACK'::text)))",
+          "columnName": "direction"
+        },
+        {
+          "name": "ledger_direction_valid",
+          "expression": "\"direction\" in ('DEBIT', 'CREDIT')",
+          "definition": "check (\"direction\" in ('DEBIT', 'CREDIT'))",
+          "columnName": "direction"
+        },
+        {
+          "name": "ledger_reason_valid",
+          "expression": "\"reason\" in ('BET', 'WIN', 'REFUND', 'ROLLBACK')",
+          "definition": "check (\"reason\" in ('BET', 'WIN', 'REFUND', 'ROLLBACK'))",
+          "columnName": "reason"
+        },
+        {
+          "name": "ledger_reversal_required",
+          "expression": "((reason = ANY (ARRAY['REFUND'::character varying, 'ROLLBACK'::character varying])) AND (reversal_of_entry_id IS NOT NULL)) OR ((reason = ANY (ARRAY['BET'::character varying, 'WIN'::character varying])) AND (reversal_of_entry_id IS NULL))",
+          "definition": "CHECK (((((reason)::text = ANY ((ARRAY['REFUND'::character varying, 'ROLLBACK'::character varying])::text[])) AND (reversal_of_entry_id IS NOT NULL)) OR (((reason)::text = ANY ((ARRAY['BET'::character varying, 'WIN'::character varying])::text[])) AND (reversal_of_entry_id IS NULL))))",
+          "columnName": "reason"
+        }
+      ],
+      "triggers": [
+        {
+          "name": "wallet_ledger_entries_immutable",
+          "timing": "before",
+          "events": [
+            "delete",
+            "update"
+          ],
+          "forEach": "row",
+          "body": ""
+        }
+      ],
+      "foreignKeys": {
+        "ledger_reversal_same_wallet_currency_fk": {
+          "columnNames": [
+            "reversal_of_entry_id",
+            "wallet_id",
+            "currency"
+          ],
+          "constraintName": "ledger_reversal_same_wallet_currency_fk",
+          "localTableName": "public.wallet_ledger_entries",
+          "referencedColumnNames": [
+            "id",
+            "wallet_id",
+            "currency"
+          ],
+          "referencedTableName": "public.wallet_ledger_entries"
+        },
+        "ledger_wager_wallet_currency_fk": {
+          "columnNames": [
+            "wager_transaction_id",
+            "wallet_id",
+            "currency"
+          ],
+          "constraintName": "ledger_wager_wallet_currency_fk",
+          "localTableName": "public.wallet_ledger_entries",
+          "referencedColumnNames": [
+            "id",
+            "wallet_id",
+            "currency"
+          ],
+          "referencedTableName": "public.wager_transactions"
+        },
+        "ledger_wallet_currency_fk": {
+          "columnNames": [
+            "wallet_id",
+            "currency"
+          ],
+          "constraintName": "ledger_wallet_currency_fk",
+          "localTableName": "public.wallet_ledger_entries",
+          "referencedColumnNames": [
+            "id",
+            "currency"
+          ],
+          "referencedTableName": "public.wallets"
+        }
+      },
       "comment": null
     },
     {
@@ -937,7 +1192,7 @@
           "autoincrement": false,
           "primary": true,
           "nullable": false,
-          "unique": false,
+          "unique": true,
           "length": null,
           "precision": null,
           "scale": null,
@@ -985,6 +1240,17 @@
       "indexes": [
         {
           "columnNames": [
+            "id",
+            "currency"
+          ],
+          "composite": true,
+          "constraint": true,
+          "keyName": "wallets_id_currency_unique",
+          "primary": false,
+          "unique": true
+        },
+        {
+          "columnNames": [
             "id"
           ],
           "composite": false,
@@ -1005,7 +1271,14 @@
           "unique": true
         }
       ],
-      "checks": [],
+      "checks": [
+        {
+          "name": "wallets_balance_non_negative",
+          "expression": "balance >= 0",
+          "definition": "CHECK ((balance >= (0)::numeric))",
+          "columnName": "balance"
+        }
+      ],
       "triggers": [],
       "foreignKeys": {},
       "comment": null

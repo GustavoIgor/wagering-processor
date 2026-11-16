@@ -115,4 +115,30 @@ export class WagerTransaction {
       throw new Error('Transaction is already terminal');
     }
   }
+
+  static restore(data: {
+    id: string;
+    providerId: string;
+    playerId: string;
+    walletId: string;
+    roundId: string;
+    operation: WagerOperation;
+    amount: Money;
+    referenceTransactionId: string | null;
+    status: WagerStatus;
+    failureCode: string | null;
+  }): WagerTransaction {
+    return new WagerTransaction(
+      data.id,
+      data.providerId,
+      data.playerId,
+      data.walletId,
+      data.roundId,
+      data.operation,
+      data.amount,
+      data.referenceTransactionId,
+      data.status,
+      data.failureCode,
+    );
+  }
 }

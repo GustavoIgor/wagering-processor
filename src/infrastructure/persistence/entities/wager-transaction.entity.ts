@@ -10,6 +10,7 @@ import {
 @Entity({ tableName: 'wager_transactions' })
 @Index({ properties: ['providerId', 'playerId', 'roundId'] })
 @Index({ properties: ['status', 'createdAt'] })
+@Index({ properties: ['status', 'nextReferenceCheckAt'] })
 export class WagerTransactionEntity {
   @PrimaryKey({ type: 'uuid' })
   id!: string;
@@ -50,6 +51,15 @@ export class WagerTransactionEntity {
 
   @Property({ length: 100, nullable: true })
   failureCode: string | null = null;
+
+  @Property({ type: 'integer', default: 0 })
+  referenceAttempts = 0;
+
+  @Property({ nullable: true })
+  nextReferenceCheckAt: Date | null = null;
+
+  @Property({ nullable: true })
+  referenceExpiresAt: Date | null = null;
 
   @Property()
   createdAt: Date = new Date();
